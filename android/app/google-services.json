@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1071680529670",
+    "project_id": "teachsync-3e5d9",
+    "storage_bucket": "teachsync-3e5d9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1071680529670:android:17039d5e0c7380fea72a87",
+        "android_client_info": {
+          "package_name": "com.example.vteachsync"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDt8_pqkUbeAXJKgHxQ3XpC9npRB8n65Nw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
