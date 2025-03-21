@@ -5,18 +5,25 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:vteachsync/auth/login_screen.dart';
 
 class RegistrationPage extends StatefulWidget {
+  const RegistrationPage({super.key});
+
   @override
   _RegistrationPageState createState() => _RegistrationPageState();
 }
 
 class _RegistrationPageState extends State<RegistrationPage> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  String _selectedRole = 'Student'; // Default role
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+
+  // List of available roles
+  final List<String> _roles = ['Student', 'Teacher'];
 
   Future<void> _registerUser() async {
     if (_formKey.currentState!.validate()) {
@@ -34,27 +41,36 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
         print('User created with UID: ${userCredential.user!.uid}');
 
+        // Send email verification
+        await userCredential.user!.sendEmailVerification();
+        print('Verification email sent');
+
         // Save user data to Firestore
         print('Saving user data to Firestore...');
         await FirebaseFirestore.instance
             .collection('users')
             .doc(userCredential.user!.uid)
             .set({
+          'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
+          'role': _selectedRole,
+          'emailVerified': false,
+          'isTeacherApproved': _selectedRole == 'Teacher' ? false : null,
           'createdAt': Timestamp.now(),
         });
         print('User data saved successfully.');
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Registration successful!'),
+            content: Text('Registration successful! Please verify your email.'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
         );
 
-        // Navigate to another page after registration
-        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+        // Navigate to login page after registration
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (context) => LoginPage()));
       } on FirebaseAuthException catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -176,6 +192,91 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       padding: EdgeInsets.all(24),
                       child: Column(
                         children: [
+                          // Name Field (NEW)
+                          TextFormField(
+                            controller: _nameController,
+                            keyboardType: TextInputType.name,
+                            style: TextStyle(fontSize: 16),
+                            decoration: InputDecoration(
+                              labelText: 'Name',
+                              hintText: 'Enter your full name',
+                              prefixIcon: Icon(
+                                Icons.person_outline,
+                                color: Color(0xFF6A11CB),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[100],
+                              contentPadding: EdgeInsets.symmetric(vertical: 20),
+                              floatingLabelBehavior: FloatingLabelBehavior.never,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your name';
+                              }
+                              return null;
+                            },
+                          ),
+                          
+                          SizedBox(height: 20),
+                          
+                          // Role Dropdown (NEW)
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.school_outlined,
+                                  color: Color(0xFF6A11CB),
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButtonFormField<String>(
+                                      decoration: InputDecoration(
+                                        border: InputBorder.none,
+                                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                      hint: Text('Select Role'),
+                                      value: _selectedRole,
+                                      isExpanded: true,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.black87,
+                                      ),
+                                      items: _roles.map((String role) {
+                                        return DropdownMenuItem<String>(
+                                          value: role,
+                                          child: Text(role),
+                                        );
+                                      }).toList(),
+                                      onChanged: (String? newValue) {
+                                        setState(() {
+                                          _selectedRole = newValue!;
+                                        });
+                                      },
+                                      validator: (value) {
+                                        if (value == null || value.isEmpty) {
+                                          return 'Please select a role';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          SizedBox(height: 20),
+                          
                           // Email Field
                           TextFormField(
                             controller: _emailController,
@@ -301,6 +402,35 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               return null;
                             },
                           ),
+                          
+                          // Information about verification for teachers
+                          if (_selectedRole == 'Teacher')
+                            Padding(
+                              padding: const EdgeInsets.only(top: 20),
+                              child: Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.info_outline, color: Colors.blue),
+                                    SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        'Teacher accounts require email verification AND admin approval before login.',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.blue[800],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -308,7 +438,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     SizedBox(height: 30),
                     
                     // Register Button
-                    Container(
+                    SizedBox(
                       height: 60,
                       child: _isLoading
                           ? Center(
@@ -318,14 +448,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             )
                           : ElevatedButton(
                               onPressed: _registerUser,
-                              child: Text(
-                                'CREATE ACCOUNT',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
                               style: ElevatedButton.styleFrom(
                                 foregroundColor: Color(0xFF6A11CB),
                                 backgroundColor: Colors.white,
@@ -333,6 +455,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                 shadowColor: Colors.black38,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              child: Text(
+                                'CREATE ACCOUNT',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.5,
                                 ),
                               ),
                             ),
@@ -356,16 +486,16 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             // Navigate to Login page
                             Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LoginPage()));
                           },
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            textStyle: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           child: Text(
                             'Login',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
                             ),
-                          ),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            textStyle: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
@@ -383,6 +513,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();

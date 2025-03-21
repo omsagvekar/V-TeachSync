@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vteachsync/auth/registration_screen.dart';
-import '/screens/home_screen.dart';
+// Import your home page and admin page
+import 'package:vteachsync/screens/home_screen.dart';
+import 'package:vteachsync/admin/admin_screen.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
   _LoginPageState createState() => _LoginPageState();
 }
@@ -15,22 +20,119 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  Future<void> _loginUser() async {
+  Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
       try {
-        // Sign in with Firebase Authentication
+        String email = _emailController.text.trim();
+        String password = _passwordController.text.trim();
+
+        // Authenticate user with Firebase Auth
         UserCredential userCredential =
             await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
+          email: email,
+          password: password,
         );
 
-        print('User signed in: ${userCredential.user!.uid}');
-        
+        // Get the authenticated user
+        User? user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          throw FirebaseAuthException(
+              code: 'user-not-found', message: 'User not found.');
+        }
+
+        // Fetch user data from Firestore
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (!userDoc.exists) {
+          throw FirebaseAuthException(
+              code: 'user-not-found', message: 'User data not found.');
+        }
+
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+        String role = userData['role'] ?? '';
+
+        // **Admin Login (Bypass Email Verification)**
+        if (role == "admin") {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Admin login successful!'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          Navigator.pushReplacement(
+              context, MaterialPageRoute(builder: (context) => AdminScreen()));
+          return;
+        }
+
+        // **For Non-Admin Users, Check Email Verification**
+        if (!user.emailVerified) {
+          await FirebaseAuth.instance.signOut();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please verify your email before logging in.'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              action: SnackBarAction(
+                label: 'Resend',
+                onPressed: () async {
+                  await user.sendEmailVerification();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Verification email sent!'),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+          return;
+        }
+
+        // Update email verification status in Firestore
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+          'emailVerified': true,
+        });
+
+        // **Teacher Login: Must Be Approved**
+        if (role == "Teacher") {
+          bool? isApproved = userData['isTeacherApproved'];
+          if (isApproved != true) {
+            await FirebaseAuth.instance.signOut();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content:
+                    Text('Your teacher account is pending admin approval.'),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Teacher login successful!'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          Navigator.pushReplacement(
+              context, MaterialPageRoute(builder: (context) => HomeScreen()));
+          return;
+        }
+
+        // **Regular User Login**
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Login successful!'),
@@ -38,18 +140,27 @@ class _LoginPageState extends State<LoginPage> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-
-        // Navigate to another page after login
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (context) => HomeScreen()));
       } on FirebaseAuthException catch (e) {
+        String errorMessage = 'Login failed';
+        if (e.code == 'user-not-found') {
+          errorMessage = 'No user found with this email.';
+        } else if (e.code == 'wrong-password') {
+          errorMessage = 'Incorrect password.';
+        } else if (e.code == 'invalid-credential') {
+          errorMessage = 'Invalid email or password.';
+        } else if (e.code == 'user-disabled') {
+          errorMessage = 'This account has been disabled.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.message ?? 'Login failed'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
         );
-        print('Firebase Auth Error: ${e.message}');
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -58,12 +169,45 @@ class _LoginPageState extends State<LoginPage> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        print('Error: $e');
       } finally {
         setState(() {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _sendPasswordResetEmail() async {
+    if (_emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please enter your email address'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _emailController.text.trim(),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Password reset email sent!'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send password reset email: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -88,11 +232,10 @@ class _LoginPageState extends State<LoginPage> {
               child: Form(
                 key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(height: 60),
-                    
-                    // App Logo or Icon in a card
+
+                    // App Logo
                     Center(
                       child: Container(
                         width: 100,
@@ -110,16 +253,15 @@ class _LoginPageState extends State<LoginPage> {
                           ],
                         ),
                         child: Icon(
-                          Icons.person_outline_rounded,
+                          Icons.login_rounded,
                           size: 60,
                           color: Color(0xFF6A11CB),
                         ),
                       ),
                     ),
-                    
-                    SizedBox(height: 40),
-                    
-                    // Welcome Text
+
+                    SizedBox(height: 30),
+
                     Text(
                       'Welcome Back',
                       style: TextStyle(
@@ -130,11 +272,11 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    
+
                     SizedBox(height: 12),
-                    
+
                     Text(
-                      'Sign in to continue',
+                      'Login to your account',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.white.withOpacity(0.8),
@@ -142,10 +284,10 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    
-                    SizedBox(height: 50),
-                    
-                    // Card container for form fields
+
+                    SizedBox(height: 40),
+
+                    // Login Form
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -180,22 +322,25 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               filled: true,
                               fillColor: Colors.grey[100],
-                              contentPadding: EdgeInsets.symmetric(vertical: 20),
-                              floatingLabelBehavior: FloatingLabelBehavior.never,
+                              contentPadding:
+                                  EdgeInsets.symmetric(vertical: 20),
+                              floatingLabelBehavior:
+                                  FloatingLabelBehavior.never,
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter your email';
                               }
-                              if (!value.contains('@')) {
+                              // Skip email validation for admin login
+                              if (value != 'admin' && !value.contains('@')) {
                                 return 'Please enter a valid email';
                               }
                               return null;
                             },
                           ),
-                          
+
                           SizedBox(height: 20),
-                          
+
                           // Password Field
                           TextFormField(
                             controller: _passwordController,
@@ -227,8 +372,10 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               filled: true,
                               fillColor: Colors.grey[100],
-                              contentPadding: EdgeInsets.symmetric(vertical: 20),
-                              floatingLabelBehavior: FloatingLabelBehavior.never,
+                              contentPadding:
+                                  EdgeInsets.symmetric(vertical: 20),
+                              floatingLabelBehavior:
+                                  FloatingLabelBehavior.never,
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -238,56 +385,44 @@ class _LoginPageState extends State<LoginPage> {
                             },
                           ),
 
-                          SizedBox(height: 12),
-                          
+                          SizedBox(height: 16),
+
                           // Forgot Password
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {
-                                // Navigate to Forgot Password page
-                                // Navigator.push(context, MaterialPageRoute(builder: (context) => ForgotPasswordPage()));
-                              },
-                              child: Text(
-                                'Forgot Password?',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
+                              onPressed: _sendPasswordResetEmail,
                               style: TextButton.styleFrom(
                                 foregroundColor: Color(0xFF6A11CB),
                                 padding: EdgeInsets.zero,
-                                minimumSize: Size(0, 30),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                'Forgot Password?',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    
+
                     SizedBox(height: 30),
-                    
+
                     // Login Button
-                    Container(
+                    SizedBox(
                       height: 60,
                       child: _isLoading
                           ? Center(
                               child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
                           : ElevatedButton(
-                              onPressed: _loginUser,
-                              child: Text(
-                                'LOGIN',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
+                              onPressed: _login,
                               style: ElevatedButton.styleFrom(
                                 foregroundColor: Color(0xFF6A11CB),
                                 backgroundColor: Colors.white,
@@ -297,11 +432,19 @@ class _LoginPageState extends State<LoginPage> {
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
+                              child: Text(
+                                'LOGIN',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
                             ),
                     ),
-                    
+
                     SizedBox(height: 24),
-                    
+
                     // Don't have an account text
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -315,19 +458,21 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         TextButton(
                           onPressed: () {
-                            // Navigate to Registration page
-                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => RegistrationPage()));
+                            Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => RegistrationPage()));
                           },
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            textStyle: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           child: Text(
-                            'Sign up',
+                            'Register',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
                             ),
-                          ),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            textStyle: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
