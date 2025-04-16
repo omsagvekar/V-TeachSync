@@ -58,7 +58,7 @@ class _LoginPageState extends State<LoginPage> {
         String role = userData['role'] ?? '';
 
         // **Admin Login (Bypass Email Verification)**
-        if (role == "admin") {
+        if (role == "Admin") {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Admin login successful!'),
@@ -67,7 +67,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
           Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (context) => AdminScreen()));
+              context, MaterialPageRoute(builder: (context) => AdminPanel()));
           return;
         }
 
@@ -332,7 +332,7 @@ class _LoginPageState extends State<LoginPage> {
                                 return 'Please enter your email';
                               }
                               // Skip email validation for admin login
-                              if (value != 'admin' && !value.contains('@')) {
+                              if (value != 'Admin' && !value.contains('@')) {
                                 return 'Please enter a valid email';
                               }
                               return null;

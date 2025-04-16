@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vteachsync/auth/login_screen.dart';
+import 'package:vteachsync/screens/home_screen.dart';
+import 'package:vteachsync/screens/explore_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userName;
@@ -18,6 +20,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<Map<String, dynamic>> _recentActivities = [];
   Map<String, dynamic> _userData = {};
   bool _isLoading = true;
+  int _selectedIndex = 2; // For bottom navigation
 
   @override
   void initState() {
@@ -138,6 +141,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  void _onItemTapped(int index) {
+    if (index == _selectedIndex) return;
+    
+    if (index == 0) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
+    } else if (index == 1) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => ExploreScreen()),
+      );
+    }
   }
 
   @override
@@ -491,6 +508,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        selectedItemColor: Color(0xFF6A11CB),
+        items: [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.explore),
+            label: 'Explore',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
       ),

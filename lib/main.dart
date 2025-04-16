@@ -1,9 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'auth/registration_screen.dart';
 import 'firebase_options.dart';
 import 'screens/home_screen.dart';
+import 'admin/admin_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,9 +69,39 @@ class AuthWrapper extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return SplashScreen(); // Show splash screen while waiting
         }
+
         if (snapshot.hasData) {
-          return HomeScreen(); // User is signed in
+          User? user = snapshot.data;
+
+          // Fetch user role from Firestore to check if the user is admin or not
+          return FutureBuilder<DocumentSnapshot>(
+            future: FirebaseFirestore.instance.collection('users').doc(user?.uid).get(),
+            builder: (context, userSnapshot) {
+              if (userSnapshot.connectionState == ConnectionState.waiting) {
+                return CircularProgressIndicator(); // Show loading indicator while fetching user data
+              }
+
+              if (userSnapshot.hasError) {
+                return Center(child: Text('Error: ${userSnapshot.error}'));
+              }
+
+              if (userSnapshot.data?.exists == true) {
+                var userData = userSnapshot.data?.data() as Map<String, dynamic>;
+                bool isAdmin = userData['role'] == 'Admin';
+
+                // Navigate to the AdminScreen if the user is an admin, otherwise navigate to HomeScreen
+                if (isAdmin) {
+                  return AdminPanel(); // Admin user
+                } else {
+                  return HomeScreen(); // Regular user
+                }
+              } else {
+                return RegistrationPage(); // If no role is found, show registration
+              }
+            },
+          );
         }
+
         return RegistrationPage(); // User is not signed in
       },
     );

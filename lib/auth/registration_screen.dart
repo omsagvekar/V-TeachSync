@@ -17,13 +17,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  String _selectedRole = 'Student'; // Default role
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-
-  // List of available roles
-  final List<String> _roles = ['Student', 'Teacher'];
 
   Future<void> _registerUser() async {
     if (_formKey.currentState!.validate()) {
@@ -53,9 +49,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
             .set({
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
-          'role': _selectedRole,
+          'role': 'User', // Default role is now 'User' for everyone
           'emailVerified': false,
-          'isTeacherApproved': _selectedRole == 'Teacher' ? false : null,
           'createdAt': Timestamp.now(),
         });
         print('User data saved successfully.');
@@ -192,7 +187,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       padding: EdgeInsets.all(24),
                       child: Column(
                         children: [
-                          // Name Field (NEW)
+                          // Name Field
                           TextFormField(
                             controller: _nameController,
                             keyboardType: TextInputType.name,
@@ -219,60 +214,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               }
                               return null;
                             },
-                          ),
-                          
-                          SizedBox(height: 20),
-                          
-                          // Role Dropdown (NEW)
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.school_outlined,
-                                  color: Color(0xFF6A11CB),
-                                ),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButtonFormField<String>(
-                                      decoration: InputDecoration(
-                                        border: InputBorder.none,
-                                        contentPadding: EdgeInsets.symmetric(vertical: 12),
-                                      ),
-                                      hint: Text('Select Role'),
-                                      value: _selectedRole,
-                                      isExpanded: true,
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.black87,
-                                      ),
-                                      items: _roles.map((String role) {
-                                        return DropdownMenuItem<String>(
-                                          value: role,
-                                          child: Text(role),
-                                        );
-                                      }).toList(),
-                                      onChanged: (String? newValue) {
-                                        setState(() {
-                                          _selectedRole = newValue!;
-                                        });
-                                      },
-                                      validator: (value) {
-                                        if (value == null || value.isEmpty) {
-                                          return 'Please select a role';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
                           
                           SizedBox(height: 20),
@@ -403,34 +344,33 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             },
                           ),
                           
-                          // Information about verification for teachers
-                          if (_selectedRole == 'Teacher')
-                            Padding(
-                              padding: const EdgeInsets.only(top: 20),
-                              child: Container(
-                                padding: EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.info_outline, color: Colors.blue),
-                                    SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        'Teacher accounts require email verification AND admin approval before login.',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.blue[800],
-                                        ),
+                          // Email verification info
+                          Padding(
+                            padding: const EdgeInsets.only(top: 20),
+                            child: Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.info_outline, color: Colors.blue),
+                                  SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Please verify your email address after registration to activate your account.',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.blue[800],
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
+                          ),
                         ],
                       ),
                     ),
