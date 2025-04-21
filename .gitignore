@@ -12,6 +12,9 @@
 .swiftpm/
 migrate_working_dir/
 
+# Ignore Firebase options file containing sensitive keys
+lib/firebase_options.dart
+
 # IntelliJ related
 *.iml
 *.ipr
