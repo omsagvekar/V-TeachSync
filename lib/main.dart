@@ -44,7 +44,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Your App Name',
+      title: 'V Teach Sync',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
@@ -78,11 +78,13 @@ class AuthWrapper extends StatelessWidget {
             future: FirebaseFirestore.instance.collection('users').doc(user?.uid).get(),
             builder: (context, userSnapshot) {
               if (userSnapshot.connectionState == ConnectionState.waiting) {
-                return CircularProgressIndicator(); // Show loading indicator while fetching user data
+                return SplashScreen(); // Show splash screen instead of just a loading indicator
               }
 
               if (userSnapshot.hasError) {
-                return Center(child: Text('Error: ${userSnapshot.error}'));
+                return Scaffold(
+                  body: Center(child: Text('Error: ${userSnapshot.error}')),
+                );
               }
 
               if (userSnapshot.data?.exists == true) {
@@ -96,7 +98,7 @@ class AuthWrapper extends StatelessWidget {
                   return HomeScreen(); // Regular user
                 }
               } else {
-                return RegistrationPage(); // If no role is found, show registration
+                return RegistrationPage(); // If no user data is found, show registration
               }
             },
           );
@@ -115,6 +117,8 @@ class SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        width: double.infinity,
+        height: double.infinity,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -130,7 +134,7 @@ class SplashScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Image.asset(
-                'assets/images/splash_screen.jpg', // Replace with your image path
+                'assets/splash_screen.jpg', // Replace with your image path
                 width: 80, // Set the width of the image
                 height: 80, // Set the height of the image
                 fit: BoxFit.contain, // Make sure it scales properly
